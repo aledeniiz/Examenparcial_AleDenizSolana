@@ -1,0 +1,231 @@
+import time
+import heapq
+import networkx as nx
+import matplotlib.pyplot as plt
+
+# Definición del grafo de localidades
+localidades = {
+    "Madrid": [("Alcorcón", 13), ("Villaviciosa de Odón", 22), ("Alcalá de Henares", 35)],
+    "Villanueva de la Cañada": [("Villaviciosa de Odón", 11), ("Boadilla del Monte", 7)],
+    "Alcorcón": [("Madrid", 13), ("Móstoles", 5)],
+    "Móstoles": [("Alcorcón", 5), ("Fuenlabrada", 8)],
+    "Fuenlabrada": [("Móstoles", 8), ("Getafe", 10)],
+    "Getafe": [("Fuenlabrada", 10), ("Madrid", 16)],
+    "Villaviciosa de Odón": [("Madrid", 22), ("Villanueva de la Cañada", 11)],
+    "Boadilla del Monte": [("Villanueva de la Cañada", 7), ("Madrid", 15)],
+    "Alcalá de Henares": [("Madrid", 35), ("Torrejón de Ardoz", 15)],
+    "Torrejón de Ardoz": [("Alcalá de Henares", 15), ("Madrid", 20)],
+}
+
+# 1. Ruta más corta entre dos localidades (usando Dijkstra)
+def ruta_mas_corta(grafo, origen, destino):
+    heap = [(0, origen, [])]
+    visitados = set()
+    while heap:
+        (costo, nodo, camino) = heapq.heappop(heap)
+        if nodo in visitados:
+            continue
+        camino = camino + [nodo]
+        visitados.add(nodo)
+        if nodo == destino:
+            return camino, costo
+        for vecino, distancia in grafo.get(nodo, []):
+            if vecino not in visitados:
+                heapq.heappush(heap, (costo + distancia, vecino, camino))
+    return None, float('inf')
+
+# 2. Identificar localidades con conexiones de menos de 15 km
+def localidades_con_conexiones_cortas(grafo, max_distancia=15):
+    resultado = []
+    for localidad, conexiones in grafo.items():
+        if all(distancia <= max_distancia for _, distancia in conexiones):
+            resultado.append(localidad)
+    return resultado
+
+# 3. Verificar la conectividad del grafo
+def es_conexo(grafo):
+    inicio = next(iter(grafo))
+    visitados = set()
+    stack = [inicio]
+    while stack:
+        nodo = stack.pop()
+        if nodo not in visitados:
+            visitados.add(nodo)
+            for vecino, _ in grafo[nodo]:
+                if vecino not in visitados:
+                    stack.append(vecino)
+    return len(visitados) == len(grafo)
+
+# 4. Rutas alternativas entre dos localidades (sin ciclos)
+def todas_las_rutas(grafo, origen, destino, camino=[]):
+    camino = camino + [origen]
+    if origen == destino:
+        return [camino]
+    if origen not in grafo:
+        return []
+    rutas = []
+    for vecino, _ in grafo[origen]:
+        if vecino not in camino:
+            nuevas_rutas = todas_las_rutas(grafo, vecino, destino, camino)
+            for nueva_ruta in nuevas_rutas:
+                rutas.append(nueva_ruta)
+    return rutas
+
+# Bonus: Ruta más larga posible sin ciclos entre dos localidades
+def ruta_mas_larga(grafo, origen, destino, camino=[]):
+    camino = camino + [origen]
+    if origen == destino:
+        return camino
+    if origen not in grafo:
+        return None
+    ruta_larga = None
+    for vecino, _ in grafo[origen]:
+        if vecino not in camino:
+            nueva_ruta = ruta_mas_larga(grafo, vecino, destino, camino)
+            if nueva_ruta:
+                if not ruta_larga or len(nueva_ruta) > len(ruta_larga):
+                    ruta_larga = nueva_ruta
+    return ruta_larga
+
+# Visualización del grafo usando NetworkX y Matplotlib
+def visualizar_grafo(grafo):
+    G = nx.Graph()
+    for localidad, conexiones in grafo.items():
+        for vecino, distancia in conexiones:
+            G.add_edge(localidad, vecino, weight=distancia)
+    
+    pos = nx.spring_layout(G)  # Posicionamiento del grafo
+    labels = nx.get_edge_attributes(G, 'weight')  # Etiquetas de peso (distancia)
+    
+    plt.figure(figsize=(12, 8))
+    nx.draw(G, pos, with_labels=True, node_size=2000, node_color="skyblue", font_size=10, font_weight="bold")
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=labels, font_color="red")
+    plt.title("Grafo de Localidades de la Comunidad de Madrid")
+    plt.show()
+
+# Variables de entrada
+origen = "Madrid"
+destino = "Getafe"
+
+# Ejecución de las funciones y visualización
+# 1. Ruta más corta
+ruta_corta, distancia_corta = ruta_mas_corta(localidades, origen, destino)
+print(f"La ruta más corta desde {origen} hasta {destino} es: {ruta_corta} con una distancia de {distancia_corta} km")
+
+# 2. Localidades con conexiones de menos de 15 km
+localidades_menor_15km = localidades_con_conexiones_cortas(localidades)
+print("Localidades con todas las conexiones de menos de 15 km:", localidades_menor_15km)
+
+# 3. Verificar la conectividad del grafo
+grafo_conexo = es_conexo(localidades)
+print("El grafo es conexo:" if grafo_conexo else "El grafo no es conexo")
+
+# 4. Todas las rutas alternativas entre dos localidades
+rutas_alternativas = todas_las_rutas(localidades, origen, destino)
+print(f"Todas las rutas alternativas desde {origen} hasta {destino} sin ciclos:")
+for ruta in rutas_alternativas:
+    print(" -> ".join(ruta))
+
+# Bonus: Ruta más larga sin ciclos
+ruta_larga = ruta_mas_larga(localidades, origen, destino)
+print(f"La ruta más larga desde {origen} hasta {destino} sin ciclos es:", " -> ".join(ruta_larga) if ruta_larga else "No se encontró una ruta")
+
+# Visualización del grafo
+visualizar_grafo(localidades)
+
+
+# Funciones del análisis de eficiencia empírica
+
+# 1. Medir el tiempo de ejecución de la función ruta más corta
+def medir_tiempo_ruta_mas_corta(grafo, origen, destino):
+    inicio = time.time()
+    ruta_mas_corta(grafo, origen, destino)
+    fin = time.time()
+    return (fin - inicio) * 1000  # Tiempo en milisegundos
+
+# 2. Medir el tiempo de ejecución de la función localidades con conexiones cortas
+def medir_tiempo_localidades_con_conexiones_cortas(grafo):
+    inicio = time.time()
+    localidades_con_conexiones_cortas(grafo)
+    fin = time.time()
+    return (fin - inicio) * 1000  # Tiempo en milisegundos
+
+# 3. Medir el tiempo de ejecución de la función es_conexo
+def medir_tiempo_es_conexo(grafo):
+    inicio = time.time()
+    es_conexo(grafo)
+    fin = time.time()
+    return (fin - inicio) * 1000  # Tiempo en milisegundos
+
+# 4. Medir el tiempo de ejecución de la función todas las rutas alternativas
+def medir_tiempo_todas_las_rutas(grafo, origen, destino):
+    inicio = time.time()
+    todas_las_rutas(grafo, origen, destino)
+    fin = time.time()
+    return (fin - inicio) * 1000  # Tiempo en milisegundos
+
+# 5. Medir el tiempo de ejecución de la función ruta más larga sin ciclos
+def medir_tiempo_ruta_mas_larga(grafo, origen, destino):
+    inicio = time.time()
+    ruta_mas_larga(grafo, origen, destino)
+    fin = time.time()
+    return (fin - inicio) * 1000  # Tiempo en milisegundos
+
+# Configurar diferentes tamaños de grafos para el análisis
+tamanos = [5, 10, 15, 20, 25]  # Tamaños simulados de número de localidades
+
+# Resultados de tiempos
+tiempos_ruta_corta = []
+tiempos_conexiones_cortas = []
+tiempos_conectividad = []
+tiempos_rutas_alternativas = []
+tiempos_ruta_larga = []
+
+# Ejecutar cada función con distintos tamaños y registrar el tiempo
+for tamano in tamanos:
+    # Crear un grafo de prueba aumentando el tamaño
+    grafo_prueba = {f"Localidad {i}": [(f"Localidad {j}", 10 + (i+j) % 5) for j in range(i + 1, tamano)] for i in range(tamano)}
+    
+    origen = "Localidad 0"
+    destino = f"Localidad {tamano - 1}"
+    
+    # Medir el tiempo de cada función
+    tiempos_ruta_corta.append(medir_tiempo_ruta_mas_corta(grafo_prueba, origen, destino))
+    tiempos_conexiones_cortas.append(medir_tiempo_localidades_con_conexiones_cortas(grafo_prueba))
+    tiempos_conectividad.append(medir_tiempo_es_conexo(grafo_prueba))
+    tiempos_rutas_alternativas.append(medir_tiempo_todas_las_rutas(grafo_prueba, origen, destino))
+    tiempos_ruta_larga.append(medir_tiempo_ruta_mas_larga(grafo_prueba, origen, destino))
+
+# Graficar los resultados en cuatro gráficos separados
+plt.figure(figsize=(12, 10))
+
+# Ruta más corta
+plt.subplot(2, 2, 1)
+plt.plot(tamanos, tiempos_ruta_corta, marker='o')
+plt.title("Tiempo - Ruta más corta")
+plt.xlabel("Número de localidades")
+plt.ylabel("Tiempo (ms)")
+
+# Localidades con conexiones cortas
+plt.subplot(2, 2, 2)
+plt.plot(tamanos, tiempos_conexiones_cortas, marker='o')
+plt.title("Tiempo - Conexiones cortas")
+plt.xlabel("Número de localidades")
+plt.ylabel("Tiempo (ms)")
+
+# Conectividad del grafo
+plt.subplot(2, 2, 3)
+plt.plot(tamanos, tiempos_conectividad, marker='o')
+plt.title("Tiempo - Conectividad del grafo")
+plt.xlabel("Número de localidades")
+plt.ylabel("Tiempo (ms)")
+
+# Rutas alternativas
+plt.subplot(2, 2, 4)
+plt.plot(tamanos, tiempos_rutas_alternativas, marker='o')
+plt.title("Tiempo - Rutas alternativas")
+plt.xlabel("Número de localidades")
+plt.ylabel("Tiempo (ms)")
+
+plt.tight_layout()
+plt.show()
